@@ -1,5 +1,7 @@
 package httpapi
 
+import "github.com/lemo/task-api/internal/task"
+
 // taskRequest is the POST and PUT body. Pointers separate a missing field from
 // a zero value (ARC-3, API-5).
 type taskRequest struct {
@@ -17,4 +19,8 @@ type taskResponse struct {
 // errorResponse is the error body (API-16).
 type errorResponse struct {
 	Error string `json:"error"`
+}
+
+func toResponse(t task.Task) taskResponse {
+	return taskResponse{ID: t.ID, Name: t.Name, Status: t.Status}
 }
