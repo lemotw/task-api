@@ -41,6 +41,7 @@
 
 - **PER-5**:系統 MUST 在開始接受 HTTP 請求之前完成載入。
 - **PER-6**:快照檔不存在時,系統 MUST 視為首次啟動,以空狀態開始。
+- **PER-34**:除了檔案不存在以外,其他讀取失敗(例如權限不足、路徑是目錄)MUST 拒絕啟動、以非 0 狀態碼結束並記錄原因。
 - **PER-7**:檔案存在但不符合下列任一條件時,系統 MUST 視為損毀:
   - 是合法 JSON,且符合 `PER-3`(空檔案視為損毀)
   - `version` 是此版本支援的值
@@ -79,7 +80,7 @@
 ## 7. 持久性保證
 
 - **PER-23**:API 的成功回應 MUST NOT 被解讀為資料已寫入檔案。
-- **PER-24**:優雅關閉成功後,所有已回應成功的變更 MUST 存在於快照檔。
+- **PER-24**:優雅關閉且等待請求未逾時的情況下,所有已回應成功的變更 MUST 存在於快照檔。逾時時不提供此保證。
 - **PER-25**:非優雅結束(SIGKILL、OOM、當機)後重啟,系統 MUST 還原到最後一次成功寫入的狀態。遺失範圍僅限該次寫入之後的變更。
 
 ## 8. 外部修改與多實例
@@ -108,7 +109,7 @@ docker run --rm -p 8080:8080 -v task-data:/data -e DATA_FILE=/data/tasks.json ta
 
 | 事件 | 層級 | 額外欄位 | 對應需求 |
 |---|---|---|---|
-| `snapshot.load_failed` | `ERROR` | `path`、`error` | `PER-8` |
+| `snapshot.load_failed` | `ERROR` | `path`、`error` | `PER-8`、`PER-34` |
 | `snapshot.flush_failed` | `ERROR` | `path`、`error` | `PER-19`、`PER-22` |
 
 ## 決策與理由

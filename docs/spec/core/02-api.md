@@ -6,14 +6,15 @@
 
 - **API-1**:帶有內容的回應 MUST 為 UTF-8 編碼的 JSON,且 `Content-Type` MUST 為 `application/json`。
 - **API-2**:用戶端 SHOULD 在帶 body 的請求加上 `Content-Type: application/json`。伺服器 MUST NOT 因 `Content-Type` 而拒絕請求。
-- **API-3**:路徑中的 `{id}` MUST 符合 `^[1-9][0-9]*$`,且 MUST 在實作的整數範圍內;否則伺服器 MUST 回傳 `400`。
+- **API-3**:路徑中的 `{id}` MUST 符合 `^[1-9][0-9]*$`,且 MUST 在實作的整數範圍內;否則伺服器 MUST 回傳 `400`。只有 `/tasks/` 之後恰好一個路徑區段才算 `{id}` 路徑,其他路徑 MUST 依 `API-15` 處理。
 - **API-4**:伺服器 MAY 將結尾多一個 `/` 的路徑視為相同路徑。用戶端 SHOULD NOT 依賴此行為。
+- **API-19**:本文件定義 `/tasks`、`/tasks/{id}` 和未被擴展佔用的路徑。擴展 MAY 定義其他路徑的行為,但 MUST NOT 改變 `/tasks` 和 `/tasks/{id}` 的行為。
 
 ### 請求 body
 
 適用於 `POST /tasks` 和 `PUT /tasks/{id}`。
 
-- **API-5**:body MUST 是單一 JSON 物件,且 MUST 同時包含 `name` 和 `status`。以下情況伺服器 MUST 回傳 `400`:
+- **API-5**:body MUST 是單一 JSON 物件,且 MUST 同時包含 `name` 和 `status`。欄位名稱比對 MUST 不分大小寫。以下情況伺服器 MUST 回傳 `400`:
   - body 為空或不是合法 JSON
   - JSON 值之後還有其他資料
   - 缺少必填欄位,或欄位值為 `null`
@@ -102,3 +103,6 @@ Task 的 JSON 表示:
 | 拒絕未定義欄位 | 拼錯欄位名稱時能立即發現 |
 | `id` 只接受標準十進位格式 | 避免 `01`、`+1` 指向同一筆任務 |
 | 不提供 `GET /tasks/{id}` | PDF 未要求,因此回 `405` |
+| 不檢查 `Content-Type` | `curl -d` 不加標頭也能使用;代價是其他網站可對本機服務發出跨站 POST,因此服務不應對外暴露 |
+| 欄位名稱不分大小寫 | 沿用 `encoding/json` 的行為,不多寫解析程式 |
+| 重複的 key、不合法的 UTF-8 不定義結果 | 不為這些輸入多寫解析程式 |

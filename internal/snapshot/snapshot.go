@@ -24,13 +24,16 @@ type Source interface {
 
 // Storage persists state.
 type Storage interface {
-	// Load returns found=false if there is no snapshot (PER-6), and an error
-	// wrapping ErrCorrupt if the snapshot is invalid (PER-7).
+	// Load returns found=false if there is no snapshot (PER-6), an error
+	// wrapping ErrCorrupt if the snapshot is invalid (PER-7), and any other
+	// error if the snapshot cannot be read (PER-34).
 	Load() (state task.State, found bool, err error)
 	// Save atomically replaces the snapshot (PER-11).
 	Save(state task.State) error
 	// CheckWritable reports whether Save can write to the location (PER-10).
 	CheckWritable() error
+	// Path returns the snapshot location for log events (PER-33).
+	Path() string
 }
 
 // Syncer coordinates loading, periodic flushes and the final flush.

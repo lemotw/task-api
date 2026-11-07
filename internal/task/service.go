@@ -1,5 +1,11 @@
 package task
 
+// Validate checks name and status against DOM-4, DOM-5 and DOM-8. It returns
+// *ValidationError for invalid values. Service and snapshot share these rules.
+func Validate(name string, status int) error {
+	panic("not implemented")
+}
+
 // Service applies the domain rules and delegates storage to a Repository.
 type Service struct {
 	repo Repository

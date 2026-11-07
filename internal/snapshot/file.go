@@ -28,3 +28,8 @@ func (f *File) Save(state task.State) error {
 func (f *File) CheckWritable() error {
 	panic("not implemented")
 }
+
+// Path implements Storage.
+func (f *File) Path() string {
+	panic("not implemented")
+}
