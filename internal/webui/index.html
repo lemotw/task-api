@@ -1,0 +1,238 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Task API Console</title>
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg: #f6f7f9; --panel: #ffffff; --text: #1c2024; --muted: #60656c;
+    --line: #d9dce1; --accent: #1f6feb; --ok: #1a7f37; --warn: #9a6700; --err: #cf222e;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #101215; --panel: #181b1f; --text: #e6e8eb; --muted: #9aa0a6;
+      --line: #2e3238; --accent: #58a6ff; --ok: #3fb950; --warn: #d29922; --err: #f85149;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font: 14px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  header { padding: 16px; border-bottom: 1px solid var(--line); }
+  h1 { margin: 0; font-size: 18px; }
+  h2 { margin: 0 0 12px; font-size: 14px; }
+  header p { margin: 4px 0 0; color: var(--muted); }
+  main { display: grid; gap: 16px; padding: 16px; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  section { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 16px; min-width: 0; }
+  #tasks-panel, #history-panel { grid-column: 1 / -1; }
+  @media (max-width: 760px) { main { grid-template-columns: minmax(0, 1fr); } }
+  label { display: block; margin-bottom: 12px; color: var(--muted); font-size: 12px; }
+  input, select, textarea, button { font: inherit; color: inherit; }
+  input, select, textarea { display: block; width: 100%; margin-top: 4px; padding: 6px 8px;
+    background: var(--bg); border: 1px solid var(--line); border-radius: 6px; }
+  textarea { min-height: 120px; resize: vertical; font-family: ui-monospace, Menlo, Consolas, monospace; }
+  button { padding: 6px 12px; background: transparent; border: 1px solid var(--line); border-radius: 6px; cursor: pointer; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .row { display: flex; flex-wrap: wrap; gap: 8px; }
+  .split { display: grid; gap: 12px; grid-template-columns: 1fr 1fr; }
+  table { width: 100%; border-collapse: collapse; }
+  th, td { padding: 6px 8px; border-bottom: 1px solid var(--line); text-align: left; overflow-wrap: anywhere; }
+  th { color: var(--muted); font-size: 12px; font-weight: 500; }
+  td.actions { white-space: nowrap; width: 1%; }
+  .empty { color: var(--muted); }
+  pre { margin: 4px 0 0; padding: 8px; background: var(--bg); border-radius: 6px; overflow: auto;
+        white-space: pre-wrap; overflow-wrap: anywhere; font: 12px/1.5 ui-monospace, Menlo, Consolas, monospace; }
+  article { padding: 12px 0; border-bottom: 1px solid var(--line); }
+  article:last-child { border-bottom: 0; }
+  .line { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 13px; }
+  .status { font-weight: 600; }
+  .s2 { color: var(--ok); } .s4 { color: var(--warn); } .s5, .neterr { color: var(--err); }
+  .caption { margin-top: 8px; color: var(--muted); font-size: 12px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Task API Console</h1>
+  <p>Requests are sent as written. The console does not validate input, so every result comes from the server.</p>
+</header>
+<main>
+  <section id="tasks-panel">
+    <div class="row" style="justify-content: space-between; align-items: center; margin-bottom: 12px;">
+      <h2 style="margin: 0;">Tasks</h2>
+      <button id="refresh" type="button">Refresh</button>
+    </div>
+    <table>
+      <thead><tr><th>ID</th><th>Name</th><th>Status</th><th></th></tr></thead>
+      <tbody id="tasks"></tbody>
+    </table>
+    <p id="empty" class="empty" hidden>No tasks yet. Send a POST request to create one.</p>
+  </section>
+
+  <section>
+    <h2>Request</h2>
+    <form id="form">
+      <div class="split">
+        <label>Method
+          <select id="method">
+            <option>GET</option>
+            <option selected>POST</option>
+            <option>PUT</option>
+            <option>DELETE</option>
+          </select>
+        </label>
+        <label>Task ID (PUT and DELETE)
+          <input id="id" autocomplete="off" placeholder="1">
+        </label>
+      </div>
+      <label>JSON body (POST and PUT)
+        <textarea id="body" spellcheck="false"></textarea>
+      </label>
+      <div class="row">
+        <button class="primary" type="submit">Send</button>
+        <button id="sample-create" type="button">Valid create</button>
+        <button id="sample-status" type="button">Invalid status</button>
+        <button id="sample-syntax" type="button">Broken JSON</button>
+      </div>
+    </form>
+  </section>
+
+  <section>
+    <h2>Latest response</h2>
+    <div id="latest" class="empty">No requests yet.</div>
+  </section>
+
+  <section id="history-panel">
+    <div class="row" style="justify-content: space-between; align-items: center; margin-bottom: 12px;">
+      <h2 style="margin: 0;">History</h2>
+      <button id="clear" type="button">Clear</button>
+    </div>
+    <div id="history"><p class="empty">No requests yet.</p></div>
+  </section>
+</main>
+
+<script>
+"use strict";
+const $ = (id) => document.getElementById(id);
+const samples = {
+  create: '{\n  "name": "buy milk",\n  "status": 0\n}',
+  status: '{\n  "name": "buy milk",\n  "status": 2\n}',
+  syntax: '{\n  "name": "buy milk",\n',
+};
+
+function el(tag, className, text) {
+  const node = document.createElement(tag);
+  if (className) node.className = className;
+  if (text !== undefined) node.textContent = text;
+  return node;
+}
+
+// Every server value is shown through textContent, never parsed as HTML.
+function renderTasks(tasks) {
+  const rows = $("tasks");
+  rows.replaceChildren();
+  $("empty").hidden = tasks.length > 0;
+  for (const task of tasks) {
+    const row = el("tr");
+    row.append(el("td", "", String(task.id)), el("td", "", task.name),
+      el("td", "", task.status === 1 ? "1 (completed)" : "0 (incomplete)"));
+    const actions = el("td", "actions");
+    const edit = el("button", "", "Edit");
+    edit.type = "button";
+    edit.addEventListener("click", () => {
+      $("method").value = "PUT";
+      $("id").value = String(task.id);
+      $("body").value = JSON.stringify({ name: task.name, status: task.status }, null, 2);
+      $("body").focus();
+    });
+    const del = el("button", "", "Delete");
+    del.type = "button";
+    del.style.marginLeft = "8px";
+    del.addEventListener("click", () => send("DELETE", taskPath(String(task.id)), null));
+    actions.append(edit, del);
+    row.append(actions);
+    rows.append(row);
+  }
+}
+
+function taskPath(id) {
+  return "/tasks/" + encodeURIComponent(id);
+}
+
+function describe(entry) {
+  const box = el("div");
+  box.append(el("div", "line", entry.method + " " + entry.path));
+  if (entry.body !== null) {
+    box.append(el("div", "caption", "Request body"), el("pre", "", entry.body));
+  }
+  if (entry.error) {
+    box.append(el("div", "line neterr", "Network error: " + entry.error));
+    return box;
+  }
+  const family = Math.floor(entry.status / 100);
+  box.append(el("div", "line status s" + family, "HTTP " + entry.status));
+  box.append(el("div", "caption", "Response body"));
+  box.append(el("pre", "", entry.text === "" ? "(no response body)" : entry.text));
+  return box;
+}
+
+function record(entry) {
+  const latest = $("latest");
+  latest.className = "";
+  latest.replaceChildren(describe(entry));
+
+  const history = $("history");
+  if (history.querySelector(".empty")) history.replaceChildren();
+  const item = el("article");
+  item.append(describe(entry));
+  history.prepend(item);
+}
+
+async function send(method, path, body) {
+  const options = { method };
+  if (body !== null) {
+    options.body = body;
+    options.headers = { "Content-Type": "application/json" };
+  }
+  try {
+    const response = await fetch(path, options);
+    const text = await response.text();
+    record({ method, path, body, status: response.status, text });
+    if (response.ok && method !== "GET") await loadTasks();
+    if (response.ok && method === "GET" && path === "/tasks") renderTasks(JSON.parse(text));
+  } catch (error) {
+    record({ method, path, body, error: String(error) });
+  }
+}
+
+async function loadTasks() {
+  try {
+    const response = await fetch("/tasks");
+    if (!response.ok) throw new Error("HTTP " + response.status);
+    renderTasks(await response.json());
+  } catch (error) {
+    record({ method: "GET", path: "/tasks", body: null, error: String(error) });
+  }
+}
+
+$("form").addEventListener("submit", (event) => {
+  event.preventDefault();
+  const method = $("method").value;
+  const path = method === "PUT" || method === "DELETE" ? taskPath($("id").value) : "/tasks";
+  const body = method === "POST" || method === "PUT" ? $("body").value : null;
+  send(method, path, body);
+});
+
+$("refresh").addEventListener("click", () => send("GET", "/tasks", null));
+$("sample-create").addEventListener("click", () => { $("body").value = samples.create; });
+$("sample-status").addEventListener("click", () => { $("body").value = samples.status; });
+$("sample-syntax").addEventListener("click", () => { $("body").value = samples.syntax; });
+$("clear").addEventListener("click", () => {
+  $("history").replaceChildren(el("p", "empty", "No requests yet."));
+});
+
+$("body").value = samples.create;
+loadTasks();
+</script>
+</body>
+</html>

@@ -11,15 +11,16 @@ type WriterSink struct {
 
 // NewWriterSink returns a WriterSink.
 func NewWriterSink(w io.Writer) *WriterSink {
-	panic("not implemented")
+	return &WriterSink{w: w}
 }
 
 // Write implements Sink.
 func (s *WriterSink) Write(line []byte) error {
-	panic("not implemented")
+	_, err := s.w.Write(line)
+	return err
 }
 
 // Close implements Sink. It does not close the underlying writer.
 func (s *WriterSink) Close() error {
-	panic("not implemented")
+	return nil
 }

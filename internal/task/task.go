@@ -38,5 +38,5 @@ type ValidationError struct {
 
 // Error implements error.
 func (e *ValidationError) Error() string {
-	panic("not implemented")
+	return e.Message
 }
