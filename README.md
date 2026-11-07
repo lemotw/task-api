@@ -109,6 +109,13 @@ Every event is one JSON line on stdout. `log_type` separates per-request
 docker logs <container> 2>&1 | jq -c 'select(.log_type == "access")'
 ```
 
+## Known limitations
+
+- **Task ids are not checked for exhaustion.** Ids are 64-bit integers. Only a
+  hand-edited snapshot with `next_id` at the maximum can reach the limit; the
+  next create then overflows, and the next startup refuses the snapshot without
+  overwriting it. See [the domain spec](docs/spec/core/01-domain.md).
+
 ## Layout
 
 | Path | Contents |
