@@ -28,6 +28,7 @@ cmd/server/        組裝各層、啟動與關閉
 internal/task/     Task、領域錯誤、Service、Repository 介面
 internal/memory/   Repository 的 in-memory 實作
 internal/httpapi/  Handler 和請求/回應的 DTO
+internal/logging/  日誌事件的編碼與輸出
 ```
 
 - **ARC-5**:Repository 介面 MUST 定義在 `internal/task`,由使用方擁有。

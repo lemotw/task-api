@@ -16,7 +16,7 @@
 
 | 部分 | 內容 | 來源 |
 |---|---|---|
-| **核心** (`core/`) | 作業要求的功能與品質 | 作業 PDF |
+| **核心** (`core/`) | 作業要求的功能與品質,以及服務運作必備的日誌 | 作業 PDF、專案自訂 |
 | **擴展** (`extensions/`) | memory <-> file 同步、測試用前端 | 專案自行擴展 |
 
 擴展功能全部停用時,系統 MUST 仍完全符合核心 spec。
@@ -39,7 +39,8 @@ docs/spec/
 ├── core/
 │   ├── 01-domain.md
 │   ├── 02-api.md
-│   └── 03-architecture.md
+│   ├── 03-architecture.md
+│   └── 04-log.md
 └── extensions/
     ├── 10-persistence.md
     └── 11-web-ui.md
@@ -51,6 +52,7 @@ docs/spec/
 10-persistence
 
 03-architecture 描述核心各層如何組成;擴展可引用它。
+04-log 依賴 02-api、03-architecture;10-persistence 依賴 04-log。
 ```
 
 撰寫規則:
