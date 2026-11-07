@@ -120,7 +120,7 @@
 docker logs task-api 2>&1 | jq -c 'select(.log_type == "access")'
 ```
 
-實作注意:`log/slog` 要到 Go 1.21 才有,受 `ARC-8` 限制。
+實作注意:實作可以使用 `log/slog`,但輸出仍要符合本文件的欄位定義,例如以 `event` 取代預設的 `msg`。
 
 ## 決策與理由
 
