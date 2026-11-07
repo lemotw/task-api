@@ -60,19 +60,19 @@ func (f *File) Load() (task.State, bool, error) {
 	return state, true, nil
 }
 
-// Save implements Storage. It writes a temporary file in the same directory and
-// renames it over the target, so the old snapshot stays whole on failure
-// (PER-11). The temporary name is fixed, so a crash leaves at most one behind
-// and the next Save overwrites it.
+// Save implements Storage. It writes a new temporary file in the same directory
+// and renames it over the target, so the old snapshot stays whole on failure
+// (PER-11). The temporary file is always newly created, so nothing already in
+// the directory, such as a symlink, is written through. A crash can leave a
+// temporary file behind; it is never read.
 func (f *File) Save(state task.State) error {
 	data, err := encodeState(state)
 	if err != nil {
 		return fmt.Errorf("encode snapshot: %w", err)
 	}
 
-	tmp := f.path + ".tmp"
-	if err := writeSynced(tmp, data); err != nil {
-		_ = os.Remove(tmp)
+	tmp, err := writeTemp(filepath.Dir(f.path), filepath.Base(f.path)+".tmp-*", data)
+	if err != nil {
 		return fmt.Errorf("write snapshot: %w", err)
 	}
 	if err := os.Rename(tmp, f.path); err != nil {
@@ -101,22 +101,32 @@ func (f *File) Path() string {
 	return f.path
 }
 
-func writeSynced(path string, data []byte) error {
-	file, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, filePerm)
+// writeTemp creates a new file in dir, writes data, syncs it and returns its
+// path. On failure it removes the file.
+func writeTemp(dir, pattern string, data []byte) (path string, err error) {
+	file, err := os.CreateTemp(dir, pattern)
 	if err != nil {
-		return err
+		return "", err
 	}
-	defer file.Close()
-	if err := file.Chmod(filePerm); err != nil { // a leftover file may differ
-		return err
+	defer func() {
+		if err != nil {
+			_ = file.Close()
+			_ = os.Remove(file.Name())
+		}
+	}()
+	if err := file.Chmod(filePerm); err != nil {
+		return "", err
 	}
 	if _, err := file.Write(data); err != nil {
-		return err
+		return "", err
 	}
 	if err := file.Sync(); err != nil {
-		return err
+		return "", err
 	}
-	return file.Close()
+	if err := file.Close(); err != nil {
+		return "", err
+	}
+	return file.Name(), nil
 }
 
 // syncDir makes the rename durable where possible (PER-12). The new snapshot is

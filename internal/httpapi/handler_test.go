@@ -602,6 +602,55 @@ func TestAccessLog_RecordsEveryRequestAccurately(t *testing.T) {
 	}
 }
 
+// A real server sends no body for HEAD, so the log must not count one. The
+// ResponseRecorder keeps HEAD bodies, so this needs a real server.
+func TestAccessLog_HeadOnRealServerHasZeroBytes(t *testing.T) {
+	e := newEnv(nil)
+	server := httptest.NewServer(e.handler)
+	defer server.Close()
+
+	for _, target := range []string{"/tasks", "/tasks/1", "/nope"} {
+		req, err := http.NewRequest(http.MethodHead, server.URL+target, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		resp, err := server.Client().Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		body, _ := io.ReadAll(resp.Body)
+		resp.Body.Close()
+
+		events := e.log.AccessEvents()
+		got := events[len(events)-1]
+		if got.Method != http.MethodHead || got.Status != resp.StatusCode {
+			t.Fatalf("%s: event = %+v, response status %d", target, got, resp.StatusCode)
+		}
+		if got.Bytes != int64(len(body)) || got.Bytes != 0 {
+			t.Errorf("%s: logged %d bytes, sent %d", target, got.Bytes, len(body))
+		}
+	}
+}
+
+// For other methods the logged size matches what the client received.
+func TestAccessLog_BytesMatchRealServerResponse(t *testing.T) {
+	e := newEnv(nil)
+	server := httptest.NewServer(e.handler)
+	defer server.Close()
+
+	resp, err := server.Client().Post(server.URL+"/tasks", "application/json", strings.NewReader(validBody))
+	if err != nil {
+		t.Fatal(err)
+	}
+	body, _ := io.ReadAll(resp.Body)
+	resp.Body.Close()
+
+	events := e.log.AccessEvents()
+	if got := events[len(events)-1]; got.Bytes != int64(len(body)) || got.Bytes == 0 {
+		t.Errorf("logged %d bytes, sent %d", got.Bytes, len(body))
+	}
+}
+
 func TestAccessLog_DeleteHasZeroBytes(t *testing.T) {
 	e := newEnv(nil)
 	id := e.seed(t)

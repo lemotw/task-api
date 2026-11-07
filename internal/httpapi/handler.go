@@ -65,7 +65,7 @@ func NewHandler(deps Deps) http.Handler {
 // ServeHTTP implements http.Handler.
 func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	start := time.Now()
-	rec := &statusRecorder{ResponseWriter: w}
+	rec := &statusRecorder{ResponseWriter: w, head: r.Method == http.MethodHead}
 	route := h.route(rec, r)
 	h.deps.Log.Access(logging.AccessEvent{
 		Method:     r.Method,
@@ -243,9 +243,11 @@ func writeJSON(w http.ResponseWriter, status int, value any) {
 	_, _ = w.Write(buf.Bytes()) // the client is gone; nothing more can be done
 }
 
-// statusRecorder captures the status and size for the access log.
+// statusRecorder captures the status and size for the access log. The size is
+// what reaches the client, so it stays 0 for HEAD, whose body is never sent.
 type statusRecorder struct {
 	http.ResponseWriter
+	head   bool
 	status int
 	bytes  int64
 }
@@ -259,7 +261,9 @@ func (r *statusRecorder) WriteHeader(status int) {
 
 func (r *statusRecorder) Write(data []byte) (int, error) {
 	n, err := r.ResponseWriter.Write(data)
-	r.bytes += int64(n)
+	if !r.head {
+		r.bytes += int64(n)
+	}
 	return n, err
 }
 

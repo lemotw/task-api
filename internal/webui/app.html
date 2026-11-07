@@ -22,8 +22,12 @@
   h1 { margin: 0; font-size: 22px; }
   header a { color: var(--muted); font-size: 13px; }
   form, li { display: flex; gap: 8px; align-items: center; }
-  input[type=text] { flex: 1; min-width: 0; padding: 8px 10px; font: inherit; color: inherit;
+  input[type=text], textarea { flex: 1; min-width: 0; padding: 8px 10px; font: inherit; color: inherit;
                      background: var(--panel); border: 1px solid var(--line); border-radius: 6px; }
+  textarea { resize: vertical; }
+  li.editing { flex-wrap: wrap; }
+  li.editing textarea { flex-basis: 100%; }
+  .hint { color: var(--muted); font-size: 12px; margin-right: auto; }
   button { padding: 8px 12px; font: inherit; color: inherit; background: var(--panel);
            border: 1px solid var(--line); border-radius: 6px; cursor: pointer; }
   button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
@@ -141,10 +145,12 @@ function renderTask(task) {
   return item;
 }
 
+// A textarea keeps newlines in the name; a single-line input would drop them
+// and change the task on save (UI-25).
 function startEdit(item, task) {
-  const input = document.createElement("input");
-  input.type = "text";
+  const input = document.createElement("textarea");
   input.value = task.name;
+  input.rows = Math.max(1, task.name.split("\n").length);
   input.setAttribute("aria-label", "Task name");
   const save = document.createElement("button");
   save.className = "primary";
@@ -158,10 +164,14 @@ function startEdit(item, task) {
   save.addEventListener("click", commit);
   cancel.addEventListener("click", refresh);
   input.addEventListener("keydown", (event) => {
-    if (event.key === "Enter") commit();
+    if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) commit();
     if (event.key === "Escape") refresh();
   });
-  item.replaceChildren(input, save, cancel);
+  const hint = document.createElement("span");
+  hint.className = "hint";
+  hint.textContent = "Ctrl/Cmd+Enter to save, Esc to cancel";
+  item.classList.add("editing");
+  item.replaceChildren(input, hint, save, cancel);
   input.focus();
 }
 

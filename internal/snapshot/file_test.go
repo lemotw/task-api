@@ -350,6 +350,37 @@ func TestFile_SaveReplacesFileInsteadOfWritingInPlace(t *testing.T) {
 	}
 }
 
+// A leftover path next to the snapshot, here a symlink back to it, must not be
+// written through: Save creates its own temporary file (PER-11).
+func TestFile_SaveIgnoresExistingPathsNextToTheSnapshot(t *testing.T) {
+	f, path := newTestFile(t)
+	if err := f.Save(task.State{NextID: 2, Tasks: []task.Task{{ID: 1, Name: "old"}}}); err != nil {
+		t.Fatalf("Save = %v", err)
+	}
+	if err := os.Symlink(path, path+".tmp"); err != nil {
+		t.Fatal(err)
+	}
+
+	want := task.State{NextID: 3, Tasks: []task.Task{{ID: 2, Name: "new"}}}
+	if err := f.Save(want); err != nil {
+		t.Fatalf("Save = %v", err)
+	}
+	info, err := os.Lstat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !info.Mode().IsRegular() {
+		t.Fatalf("snapshot is %v, want a regular file", info.Mode())
+	}
+	got, _, err := f.Load()
+	if err != nil {
+		t.Fatalf("Load = %v", err)
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("state = %+v, want %+v", got, want)
+	}
+}
+
 func TestFile_RenameFailureLeavesNoTemporaryFile(t *testing.T) {
 	f, path := newTestFile(t)
 	if err := os.Mkdir(path, 0o700); err != nil { // rename onto a directory fails

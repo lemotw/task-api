@@ -55,7 +55,7 @@
 | `path` | 字串 | 請求路徑,不含 query string |
 | `status` | 整數 | 回應狀態碼 |
 | `duration_ms` | 整數 | 處理時間,單位毫秒 |
-| `bytes` | 整數 | 回應 body 的位元組數 |
+| `bytes` | 整數 | 實際送出的回應 body 位元組數;`HEAD` 請求為 `0` |
 
 - **LOG-12**:`status` 為 5xx 時,`level` MUST 為 `ERROR`,其餘 MUST 為 `INFO`。
 
