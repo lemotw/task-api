@@ -29,26 +29,34 @@ type env struct {
 	log     *logtest.Recorder
 }
 
-func newEnv(ui http.Handler) *env {
+func newEnv(pages map[string]http.Handler) *env {
 	log := &logtest.Recorder{}
 	return &env{
-		handler: NewHandler(Deps{Tasks: task.NewService(memory.New()), Log: log, UI: ui}),
+		handler: NewHandler(Deps{Tasks: task.NewService(memory.New()), Log: log, Pages: pages}),
 		log:     log,
 	}
 }
 
-func fakeUI() http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		w.Header().Set("X-Fake-UI", "1")
-		w.WriteHeader(http.StatusTeapot)
-	})
+// uiPaths are the paths the web UI owns (UI-7).
+var uiPaths = []string{"/", "/test"}
+
+// fakePages returns a page per UI path that answers 418 and names its path.
+func fakePages() map[string]http.Handler {
+	pages := make(map[string]http.Handler, len(uiPaths))
+	for _, path := range uiPaths {
+		pages[path] = http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			w.Header().Set("X-Fake-UI", path)
+			w.WriteHeader(http.StatusTeapot)
+		})
+	}
+	return pages
 }
 
 // forEachUI runs the API contract with the web UI disabled and enabled (UI-7).
 func forEachUI(t *testing.T, fn func(t *testing.T, e *env)) {
 	t.Helper()
 	t.Run("ui off", func(t *testing.T) { fn(t, newEnv(nil)) })
-	t.Run("ui on", func(t *testing.T) { fn(t, newEnv(fakeUI())) })
+	t.Run("ui on", func(t *testing.T) { fn(t, newEnv(fakePages())) })
 }
 
 func serve(h http.Handler, req *http.Request) *httptest.ResponseRecorder {
@@ -426,6 +434,10 @@ func TestUnknownPaths_ReturnNotFound(t *testing.T) {
 		{http.MethodDelete, "/tasks/1/2"},
 		{http.MethodGet, "/tasks/1/2"},
 		{http.MethodGet, "/tasksx"},
+		{http.MethodGet, "/test/"},
+		{http.MethodGet, "/test/x"},
+		{http.MethodGet, "/tests"},
+		{http.MethodGet, "/index.html"},
 	}
 	for _, c := range cases {
 		t.Run(c.method+" "+c.target, func(t *testing.T) {
@@ -440,15 +452,19 @@ func TestUnknownPaths_ReturnNotFound(t *testing.T) {
 	}
 }
 
-func TestRoot_WithoutUIReturnsNotFound(t *testing.T) {
-	assertError(t, newEnv(nil).do(http.MethodGet, "/", ""), http.StatusNotFound)
+func TestUIPaths_WithoutUIReturnNotFound(t *testing.T) {
+	for _, path := range uiPaths {
+		assertError(t, newEnv(nil).do(http.MethodGet, path, ""), http.StatusNotFound)
+	}
 }
 
-func TestRoot_WithUIIsDelegatedForAllMethods(t *testing.T) {
-	for _, method := range []string{http.MethodGet, http.MethodPost} {
-		rec := newEnv(fakeUI()).do(method, "/", "")
-		if rec.Code != http.StatusTeapot || rec.Header().Get("X-Fake-UI") != "1" {
-			t.Errorf("%s /: status %d", method, rec.Code)
+func TestUIPaths_AreDelegatedForAllMethods(t *testing.T) {
+	for _, path := range uiPaths {
+		for _, method := range []string{http.MethodGet, http.MethodPost} {
+			rec := newEnv(fakePages()).do(method, path, "")
+			if rec.Code != http.StatusTeapot || rec.Header().Get("X-Fake-UI") != path {
+				t.Errorf("%s %s: status %d, page %q", method, path, rec.Code, rec.Header().Get("X-Fake-UI"))
+			}
 		}
 	}
 }
@@ -596,12 +612,14 @@ func TestAccessLog_DeleteHasZeroBytes(t *testing.T) {
 	}
 }
 
-func TestAccessLog_RootRouteWithUI(t *testing.T) {
-	e := newEnv(fakeUI())
-	e.do(http.MethodGet, "/", "")
-	events := e.log.AccessEvents()
-	if len(events) != 1 || events[0].Route != "/" || events[0].Status != http.StatusTeapot {
-		t.Errorf("events = %+v", events)
+func TestAccessLog_UIRoutesUseTheirPath(t *testing.T) {
+	for _, path := range uiPaths {
+		e := newEnv(fakePages())
+		e.do(http.MethodGet, path, "")
+		events := e.log.AccessEvents()
+		if len(events) != 1 || events[0].Route != path || events[0].Status != http.StatusTeapot {
+			t.Errorf("%s: events = %+v", path, events)
+		}
 	}
 }
 

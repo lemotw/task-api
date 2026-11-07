@@ -96,7 +96,7 @@ func run(ctx context.Context, opts runOptions) int {
 		Handler: httpapi.NewHandler(httpapi.Deps{
 			Tasks: task.NewService(repo),
 			Log:   logger,
-			UI:    webui.Handler(),
+			Pages: webui.Pages(),
 		}),
 		ReadHeaderTimeout: readHeaderTimeout,
 	}

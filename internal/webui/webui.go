@@ -1,4 +1,4 @@
-// Package webui serves the test console embedded in the binary.
+// Package webui serves the pages embedded in the binary.
 // See docs/spec/extensions/11-web-ui.md.
 package webui
 
@@ -7,13 +7,27 @@ import (
 	"net/http"
 )
 
-//go:embed index.html
-var indexHTML []byte
+var (
+	//go:embed app.html
+	appHTML []byte
+
+	//go:embed console.html
+	consoleHTML []byte
+)
 
 const methodNotAllowedBody = `{"error":"method not allowed"}` + "\n"
 
-// Handler serves GET / (UI-1) and answers other methods with 405 (UI-2).
-func Handler() http.Handler {
+// Pages returns the web UI pages keyed by path (UI-1, UI-7): the task page at
+// / and the API test console at /test.
+func Pages() map[string]http.Handler {
+	return map[string]http.Handler{
+		"/":     page(appHTML),
+		"/test": page(consoleHTML),
+	}
+}
+
+// page serves html for GET and answers other methods with 405 (UI-2).
+func page(html []byte) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
 			w.Header().Set("Allow", http.MethodGet)
@@ -23,6 +37,6 @@ func Handler() http.Handler {
 			return
 		}
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		_, _ = w.Write(indexHTML)
+		_, _ = w.Write(html)
 	})
 }

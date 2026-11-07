@@ -23,6 +23,7 @@
   h1 { margin: 0; font-size: 18px; }
   h2 { margin: 0 0 12px; font-size: 14px; }
   header p { margin: 4px 0 0; color: var(--muted); }
+  header a { color: var(--accent); }
   main { display: grid; gap: 16px; padding: 16px; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
   section { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 16px; min-width: 0; }
   #tasks-panel, #history-panel { grid-column: 1 / -1; }
@@ -37,9 +38,13 @@
   .row { display: flex; flex-wrap: wrap; gap: 8px; }
   .split { display: grid; gap: 12px; grid-template-columns: 1fr 1fr; }
   table { width: 100%; border-collapse: collapse; }
-  th, td { padding: 6px 8px; border-bottom: 1px solid var(--line); text-align: left; overflow-wrap: anywhere; }
+  th, td { padding: 6px 8px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+  td.id, td.status { white-space: nowrap; }
+  td.name { width: 100%; overflow-wrap: anywhere; white-space: pre-wrap; }
   th { color: var(--muted); font-size: 12px; font-weight: 500; }
-  td.actions { white-space: nowrap; width: 1%; }
+  td.actions { white-space: nowrap; }
+  td.actions div { display: flex; gap: 8px; }
+  @media (max-width: 480px) { td.actions div { flex-direction: column; } }
   .empty { color: var(--muted); }
   pre { margin: 4px 0 0; padding: 8px; background: var(--bg); border-radius: 6px; overflow: auto;
         white-space: pre-wrap; overflow-wrap: anywhere; font: 12px/1.5 ui-monospace, Menlo, Consolas, monospace; }
@@ -54,7 +59,8 @@
 <body>
 <header>
   <h1>Task API Console</h1>
-  <p>Requests are sent as written. The console does not validate input, so every result comes from the server.</p>
+  <p>Requests are sent as written. The console does not validate input, so every result comes from the server.
+     <a href="/">Back to tasks</a></p>
 </header>
 <main>
   <section id="tasks-panel">
@@ -134,9 +140,11 @@ function renderTasks(tasks) {
   $("empty").hidden = tasks.length > 0;
   for (const task of tasks) {
     const row = el("tr");
-    row.append(el("td", "", String(task.id)), el("td", "", task.name),
-      el("td", "", task.status === 1 ? "1 (completed)" : "0 (incomplete)"));
-    const actions = el("td", "actions");
+    row.append(el("td", "id", String(task.id)), el("td", "name", task.name),
+      el("td", "status", task.status === 1 ? "1 (done)" : "0 (open)"));
+    const cell = el("td", "actions");
+    const actions = el("div");
+    cell.append(actions);
     const edit = el("button", "", "Edit");
     edit.type = "button";
     edit.addEventListener("click", () => {
@@ -147,10 +155,9 @@ function renderTasks(tasks) {
     });
     const del = el("button", "", "Delete");
     del.type = "button";
-    del.style.marginLeft = "8px";
     del.addEventListener("click", () => send("DELETE", taskPath(String(task.id)), null));
     actions.append(edit, del);
-    row.append(actions);
+    row.append(cell);
     rows.append(row);
   }
 }

@@ -20,7 +20,6 @@ import (
 const MaxBodyBytes = 1 << 20
 
 const (
-	routeRoot      = "/"
 	routeTasks     = "/tasks"
 	routeTask      = "/tasks/{id}"
 	routeUnmatched = "unmatched"
@@ -46,8 +45,9 @@ type TaskService interface {
 type Deps struct {
 	Tasks TaskService
 	Log   logging.Logger
-	// UI serves GET / when set. It is nil when the web UI is disabled.
-	UI http.Handler
+	// Pages serves the web UI, keyed by exact path (UI-7). It is nil when the
+	// web UI is disabled.
+	Pages map[string]http.Handler
 }
 
 // handler routes requests in one place so the check order of API-7 is explicit.
@@ -92,9 +92,9 @@ func (h *handler) route(w *statusRecorder, r *http.Request) string {
 		}
 		h.serveTask(w, r, segment)
 		return routeTask
-	case path == routeRoot && h.deps.UI != nil:
-		h.deps.UI.ServeHTTP(w, r)
-		return routeRoot
+	case h.deps.Pages[path] != nil:
+		h.deps.Pages[path].ServeHTTP(w, r)
+		return path
 	default:
 		writeError(w, http.StatusNotFound, "not found")
 		return routeUnmatched

@@ -337,9 +337,12 @@ func TestRun_ServesAPIAndStopsCleanly(t *testing.T) {
 
 func TestRun_ServesWebUI(t *testing.T) {
 	s := startServer(t, nil, defaultShutdownTimeout)
-	code, body := s.request(http.MethodGet, "/", "")
-	if code != http.StatusOK || !strings.Contains(strings.ToLower(body), "<html") {
-		t.Errorf("GET /: %d", code)
+	pages := map[string]string{"/": "<title>Tasks</title>", "/test": "<title>Task API Console</title>"}
+	for path, title := range pages {
+		code, body := s.request(http.MethodGet, path, "")
+		if code != http.StatusOK || !strings.Contains(body, title) {
+			t.Errorf("GET %s: status %d, title %q not found", path, code, title)
+		}
 	}
 }
 

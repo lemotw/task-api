@@ -70,12 +70,14 @@ curl -i -X PUT localhost:8080/tasks/1 -d '{"name":"buy milk","status":1}'
 curl -i -X DELETE localhost:8080/tasks/1
 ```
 
-## Web console
+## Web pages
 
-Open <http://localhost:8080/> to list, create, edit and delete tasks. The
-console sends requests exactly as written, so it can also send invalid input
-and show the server's raw response. The API has no authentication, so do not
-expose the service publicly.
+| Page | For |
+|---|---|
+| <http://localhost:8080/> | Managing tasks: add, complete, rename and delete |
+| <http://localhost:8080/test> | Testing the API: sends requests exactly as written, including invalid input, and shows the raw response |
+
+The API has no authentication, so do not expose the service publicly.
 
 ## Configuration
 
