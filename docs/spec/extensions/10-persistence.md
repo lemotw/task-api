@@ -34,7 +34,7 @@
 }
 ```
 
-- **PER-3**:快照 MUST 包含 `version`、`next_id` 和 `tasks`。
+- **PER-3**:快照 MUST 包含 `version`、`next_id` 和 `tasks`。`tasks` MUST 是陣列,沒有任務時 MUST 寫成 `[]`;值為 `null` 時 MUST 視為損毀。
 - **PER-4**:快照 MUST 是某一時間點的一致狀態,`next_id` 和 `tasks` MUST 來自同一個臨界區。
 
 ## 4. 啟動載入
