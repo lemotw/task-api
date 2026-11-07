@@ -1,0 +1,8 @@
+.git
+.claude
+docs
+**/test.md
+**/*_test.go
+Dockerfile
+.dockerignore
+README.md
