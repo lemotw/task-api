@@ -52,10 +52,10 @@ type Repository interface {
 ## 4. 執行環境與設定
 
 - **ARC-8**:程式碼 MUST 可在 Go 1.26 編譯與執行,且 `go.mod` MUST 宣告 `go 1.26.0`。
-- **ARC-9**:正式程式碼 SHOULD NOT 使用第三方相依套件。
+- **ARC-9**:除 HTTP 路由外,正式程式碼 SHOULD NOT 使用第三方相依套件。
 - **ARC-10**:伺服器 MUST 預設監聽 `8080`,並 MUST 支援以 `PORT` 環境變數覆寫。
 
-實作注意(僅供參考):實作可以使用帶方法的 `ServeMux` 路由模式、`http.MaxBytesError` 和 `slices` 套件。
+實作注意(僅供參考):HTTP 路由使用 `github.com/go-chi/chi/v5`。它的 404、405 預設回應不是 JSON,也不會為 `405` 設定 `Allow`,所以兩者都由 `internal/httpapi` 自訂,以符合 `API-14`、`API-16`。
 
 ## 5. 測試
 
@@ -85,3 +85,5 @@ type Repository interface {
 | 必填檢查放 Handler | 「沒送」和「送了 0」只有在解析 JSON 時才分得出來 |
 | Repository 提供 `Update`,不用 `Get` + `Save` | 避免併發時把剛刪除的任務寫回去 |
 | 使用 Go 1.26 | 符合 PDF 的 Go 1.18+;可直接使用較新的標準函式庫功能 |
+| 原則上不用第三方套件(`ARC-9`) | API 很小,標準函式庫足夠;也少一份供應鏈風險 |
+| HTTP 路由例外使用 chi | 路由集中註冊、一眼可見,方便維護;chi 沒有其他相依,handler 仍是標準 `http.HandlerFunc` |

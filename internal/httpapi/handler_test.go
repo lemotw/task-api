@@ -434,6 +434,8 @@ func TestUnknownPaths_ReturnNotFound(t *testing.T) {
 		{http.MethodDelete, "/tasks/1/2"},
 		{http.MethodGet, "/tasks/1/2"},
 		{http.MethodGet, "/tasksx"},
+		{http.MethodPut, "/tasks/"},
+		{http.MethodDelete, "/tasks//"},
 		{http.MethodGet, "/test/"},
 		{http.MethodGet, "/test/x"},
 		{http.MethodGet, "/tests"},
@@ -477,7 +479,8 @@ func TestCheckOrder(t *testing.T) {
 		want                        int
 	}{
 		{"path before method", http.MethodDelete, "/nope", "", http.StatusNotFound},
-		{"id before method", http.MethodGet, "/tasks/abc", "", http.StatusBadRequest},
+		{"method before id", http.MethodGet, "/tasks/abc", "", http.StatusMethodNotAllowed},
+		{"method before id with body", http.MethodPost, "/tasks/abc", validBody, http.StatusMethodNotAllowed},
 		{"id before size", http.MethodPut, "/tasks/abc", oversized, http.StatusBadRequest},
 		{"method before size", http.MethodPatch, "/tasks", oversized, http.StatusMethodNotAllowed},
 		{"method before size with id", http.MethodGet, "/tasks/1", oversized, http.StatusMethodNotAllowed},

@@ -3,14 +3,16 @@ package httpapi
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"io"
 	"net/http"
 	"regexp"
 	"strconv"
-	"strings"
 	"time"
+
+	"github.com/go-chi/chi/v5"
 
 	"github.com/lemotw/task-api/internal/logging"
 	"github.com/lemotw/task-api/internal/task"
@@ -20,13 +22,7 @@ import (
 const MaxBodyBytes = 1 << 20
 
 const (
-	routeTasks     = "/tasks"
-	routeTask      = "/tasks/{id}"
-	routeUnmatched = "unmatched"
-
-	allowTasks = "GET, POST"
-	allowTask  = "PUT, DELETE"
-
+	routeUnmatched     = "unmatched"
 	eventInternalError = "http.internal_error"
 )
 
@@ -50,110 +46,117 @@ type Deps struct {
 	Pages map[string]http.Handler
 }
 
-// handler routes requests in one place so the check order of API-7 is explicit.
-// net/http's ServeMux is not used because it answers HEAD on GET routes and
-// writes its own plain-text 404 and 405 responses.
+// handler serves the API with the routes registered in routes.go.
 type handler struct {
-	deps Deps
+	deps   Deps
+	router *chi.Mux
 }
 
 // NewHandler returns the root handler, including access logging (LOG-11).
 func NewHandler(deps Deps) http.Handler {
-	return &handler{deps: deps}
+	h := &handler{deps: deps}
+	h.router = h.newRouter()
+	return h.router
 }
 
-// ServeHTTP implements http.Handler.
-func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	start := time.Now()
-	rec := &statusRecorder{ResponseWriter: w, head: r.Method == http.MethodHead}
-	route := h.route(rec, r)
-	h.deps.Log.Access(logging.AccessEvent{
-		Method:     r.Method,
-		Route:      route,
-		Path:       r.URL.Path,
-		Status:     rec.statusCode(),
-		DurationMS: time.Since(start).Milliseconds(),
-		Bytes:      rec.bytes,
+type routeKey struct{}
+
+// accessLog writes one access event per request after the response (LOG-11).
+// The route is the matched pattern, or "unmatched" for unknown paths.
+func (h *handler) accessLog(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		start := time.Now()
+		rec := &statusRecorder{ResponseWriter: w, head: r.Method == http.MethodHead}
+		route := new(string)
+		next.ServeHTTP(rec, r.WithContext(context.WithValue(r.Context(), routeKey{}, route)))
+		if *route == "" {
+			*route = chi.RouteContext(r.Context()).RoutePattern()
+		}
+		if *route == "" {
+			*route = routeUnmatched
+		}
+		h.deps.Log.Access(logging.AccessEvent{
+			Method:     r.Method,
+			Route:      *route,
+			Path:       r.URL.Path,
+			Status:     rec.statusCode(),
+			DurationMS: time.Since(start).Milliseconds(),
+			Bytes:      rec.bytes,
+		})
 	})
 }
 
-// route serves the request and returns the route name for the access log.
-func (h *handler) route(w *statusRecorder, r *http.Request) string {
-	path := r.URL.Path
-	switch {
-	case path == routeTasks:
-		h.serveTasks(w, r)
-		return routeTasks
-	case strings.HasPrefix(path, routeTasks+"/"):
-		segment := strings.TrimPrefix(path, routeTasks+"/")
-		if segment == "" || strings.Contains(segment, "/") {
-			writeError(w, http.StatusNotFound, "not found")
-			return routeUnmatched
-		}
-		h.serveTask(w, r, segment)
-		return routeTask
-	case h.deps.Pages[path] != nil:
-		h.deps.Pages[path].ServeHTTP(w, r)
-		return path
-	default:
-		writeError(w, http.StatusNotFound, "not found")
-		return routeUnmatched
+// setRoute records the route for the access log when chi has not matched one,
+// as for 405 responses.
+func setRoute(r *http.Request, pattern string) {
+	if route, ok := r.Context().Value(routeKey{}).(*string); ok && *route == "" {
+		*route = pattern
 	}
 }
 
-func (h *handler) serveTasks(w *statusRecorder, r *http.Request) {
-	switch r.Method {
-	case http.MethodGet:
-		tasks := h.deps.Tasks.List()
-		out := make([]taskResponse, 0, len(tasks))
-		for _, t := range tasks {
-			out = append(out, toResponse(t))
-		}
-		writeJSON(w, http.StatusOK, out)
-	case http.MethodPost:
-		req, ok := readTaskRequest(w, r)
-		if !ok {
-			return
-		}
-		created, err := h.deps.Tasks.Create(*req.Name, *req.Status)
-		if err != nil {
-			h.writeServiceError(w, r, routeTasks, err)
-			return
-		}
-		w.Header().Set("Location", routeTasks+"/"+strconv.Itoa(created.ID))
-		writeJSON(w, http.StatusCreated, toResponse(created))
-	default:
-		writeMethodNotAllowed(w, allowTasks)
-	}
-}
-
-func (h *handler) serveTask(w *statusRecorder, r *http.Request, segment string) {
-	id, ok := parseID(segment)
+// taskID reads {id} (API-3). On failure it writes 400 and returns false.
+func taskID(w http.ResponseWriter, r *http.Request) (int, bool) {
+	id, ok := parseID(chi.URLParam(r, "id"))
 	if !ok {
 		writeError(w, http.StatusBadRequest, "invalid task id")
+	}
+	return id, ok
+}
+
+func routePattern(r *http.Request) string {
+	return chi.RouteContext(r.Context()).RoutePattern()
+}
+
+func (h *handler) listTasks(w http.ResponseWriter, _ *http.Request) {
+	tasks := h.deps.Tasks.List()
+	out := make([]taskResponse, 0, len(tasks))
+	for _, t := range tasks {
+		out = append(out, toResponse(t))
+	}
+	writeJSON(w, http.StatusOK, out)
+}
+
+func (h *handler) createTask(w http.ResponseWriter, r *http.Request) {
+	req, ok := readTaskRequest(w, r)
+	if !ok {
 		return
 	}
-	switch r.Method {
-	case http.MethodPut:
-		req, ok := readTaskRequest(w, r)
-		if !ok {
-			return
-		}
-		updated, err := h.deps.Tasks.Update(id, *req.Name, *req.Status)
-		if err != nil {
-			h.writeServiceError(w, r, routeTask, err)
-			return
-		}
-		writeJSON(w, http.StatusOK, toResponse(updated))
-	case http.MethodDelete:
-		if err := h.deps.Tasks.Delete(id); err != nil {
-			h.writeServiceError(w, r, routeTask, err)
-			return
-		}
-		w.WriteHeader(http.StatusNoContent)
-	default:
-		writeMethodNotAllowed(w, allowTask)
+	created, err := h.deps.Tasks.Create(*req.Name, *req.Status)
+	if err != nil {
+		h.writeServiceError(w, r, err)
+		return
 	}
+	w.Header().Set("Location", "/tasks/"+strconv.Itoa(created.ID))
+	writeJSON(w, http.StatusCreated, toResponse(created))
+}
+
+func (h *handler) updateTask(w http.ResponseWriter, r *http.Request) {
+	id, ok := taskID(w, r)
+	if !ok {
+		return
+	}
+	req, ok := readTaskRequest(w, r)
+	if !ok {
+		return
+	}
+	updated, err := h.deps.Tasks.Update(id, *req.Name, *req.Status)
+	if err != nil {
+		h.writeServiceError(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, toResponse(updated))
+}
+
+func (h *handler) deleteTask(w http.ResponseWriter, r *http.Request) {
+	id, ok := taskID(w, r)
+	if !ok {
+		return
+	}
+	if err := h.deps.Tasks.Delete(id); err != nil {
+		h.writeServiceError(w, r, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func parseID(segment string) (int, bool) {
@@ -167,9 +170,9 @@ func parseID(segment string) (int, bool) {
 // readTaskRequest reads the whole body before parsing, so an oversized body is
 // reported as 413 even if it starts with invalid JSON (API-7). On failure it
 // writes the response and returns false.
-func readTaskRequest(w *statusRecorder, r *http.Request) (taskRequest, bool) {
+func readTaskRequest(w http.ResponseWriter, r *http.Request) (taskRequest, bool) {
 	var req taskRequest
-	body, err := io.ReadAll(http.MaxBytesReader(w.ResponseWriter, r.Body, MaxBodyBytes))
+	body, err := io.ReadAll(http.MaxBytesReader(w, r.Body, MaxBodyBytes))
 	if err != nil {
 		var tooLarge *http.MaxBytesError
 		if errors.As(err, &tooLarge) {
@@ -203,7 +206,7 @@ func readTaskRequest(w *statusRecorder, r *http.Request) (taskRequest, bool) {
 
 // writeServiceError maps domain errors to status codes (ARC-4). Anything else
 // is logged and hidden from the client (API-18).
-func (h *handler) writeServiceError(w *statusRecorder, r *http.Request, route string, err error) {
+func (h *handler) writeServiceError(w http.ResponseWriter, r *http.Request, err error) {
 	var invalid *task.ValidationError
 	switch {
 	case errors.As(err, &invalid):
@@ -212,7 +215,7 @@ func (h *handler) writeServiceError(w *statusRecorder, r *http.Request, route st
 		writeError(w, http.StatusNotFound, "task not found")
 	default:
 		h.deps.Log.Error(eventInternalError,
-			logging.Field{Key: "route", Value: route},
+			logging.Field{Key: "route", Value: routePattern(r)},
 			logging.Field{Key: "path", Value: r.URL.Path},
 			logging.Field{Key: "error", Value: err.Error()},
 		)

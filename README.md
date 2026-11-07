@@ -123,7 +123,7 @@ docker logs <container> 2>&1 | jq -c 'select(.log_type == "access")'
 | `cmd/server` | Configuration, wiring, startup and graceful shutdown |
 | `internal/task` | Domain model, validation and service |
 | `internal/memory` | In-memory repository |
-| `internal/httpapi` | HTTP routing, request parsing and error mapping |
+| `internal/httpapi` | HTTP routes ([chi](https://github.com/go-chi/chi)), request parsing and error mapping |
 | `internal/snapshot` | Snapshot file and sync |
 | `internal/logging` | JSON logger |
 | `internal/webui` | Embedded browser console |
