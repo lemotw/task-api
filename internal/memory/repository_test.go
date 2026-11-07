@@ -6,7 +6,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/lemo/task-api/internal/task"
+	"github.com/lemotw/task-api/internal/task"
 )
 
 func revision(r *Repository) uint64 {

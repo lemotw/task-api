@@ -5,9 +5,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/lemo/task-api/internal/logging/logtest"
-	"github.com/lemo/task-api/internal/memory"
-	"github.com/lemo/task-api/internal/task"
+	"github.com/lemotw/task-api/internal/logging/logtest"
+	"github.com/lemotw/task-api/internal/memory"
+	"github.com/lemotw/task-api/internal/task"
 )
 
 // A slow file write must not block API requests (PER-15).

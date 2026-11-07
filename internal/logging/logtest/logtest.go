@@ -4,7 +4,7 @@ package logtest
 import (
 	"sync"
 
-	"github.com/lemo/task-api/internal/logging"
+	"github.com/lemotw/task-api/internal/logging"
 )
 
 var _ logging.Logger = (*Recorder)(nil)

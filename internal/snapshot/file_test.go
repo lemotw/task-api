@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/lemo/task-api/internal/task"
+	"github.com/lemotw/task-api/internal/task"
 )
 
 func newTestFile(t *testing.T) (*File, string) {

@@ -5,7 +5,7 @@ import (
 	"sort"
 	"sync"
 
-	"github.com/lemo/task-api/internal/task"
+	"github.com/lemotw/task-api/internal/task"
 )
 
 var _ task.Repository = (*Repository)(nil)

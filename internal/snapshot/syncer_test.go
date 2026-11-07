@@ -11,9 +11,9 @@ import (
 	"testing/synctest"
 	"time"
 
-	"github.com/lemo/task-api/internal/logging"
-	"github.com/lemo/task-api/internal/logging/logtest"
-	"github.com/lemo/task-api/internal/task"
+	"github.com/lemotw/task-api/internal/logging"
+	"github.com/lemotw/task-api/internal/logging/logtest"
+	"github.com/lemotw/task-api/internal/task"
 )
 
 const (

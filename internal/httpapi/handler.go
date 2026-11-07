@@ -12,8 +12,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/lemo/task-api/internal/logging"
-	"github.com/lemo/task-api/internal/task"
+	"github.com/lemotw/task-api/internal/logging"
+	"github.com/lemotw/task-api/internal/task"
 )
 
 // MaxBodyBytes is the request body limit (API-6).

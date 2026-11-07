@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/lemo/task-api/internal/logging"
+	"github.com/lemotw/task-api/internal/logging"
 )
 
 func envOf(values map[string]string) func(string) string {
